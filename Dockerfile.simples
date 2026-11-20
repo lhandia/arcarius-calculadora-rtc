@@ -1,0 +1,26 @@
+# Calculadora oficial da Reforma Tributaria (Receita Federal) - Simples Nacional
+# Clona a versao oficial mais recente a cada build, gera o banco SQLite a partir dos
+# scripts Flyway publicos do repositorio do Regime Regular e empacota o JAR.
+# Endpoint exposto: POST /api/calculadora/observabilidade/simples-nacional
+
+FROM eclipse-temurin:25-jdk AS build
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN git clone --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git .
+# A base de referencia (calculadora-pro.db) e gerada pelos scripts Flyway do
+# repositorio do Regime Regular (ADR009 do projeto oficial).
+RUN git clone --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git /tmp/regime
+RUN cp -r /tmp/regime/flyway ./flyway \
+    && mkdir -p ./calculadora/db \
+    && ./mvnw flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf --batch-mode --errors \
+    && ./mvnw clean package -DskipTests --batch-mode
+
+FROM eclipse-temurin:25-jdk
+WORKDIR /app
+COPY --from=build /app/target/api-simples-nacional.jar /app/api-simples-nacional.jar
+COPY --from=build /app/calculadora/db /app/calculadora/db
+ENV SERVER_PORT=8082
+EXPOSE 8082
+ENTRYPOINT ["java", "-Dspring.profiles.active=offline", "-jar", "/app/api-simples-nacional.jar"]
