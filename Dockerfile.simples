@@ -1,21 +1,23 @@
 # Calculadora oficial da Reforma Tributaria (Receita Federal) - Simples Nacional
-# Clona a versao oficial mais recente a cada build, gera o banco SQLite a partir dos
-# scripts Flyway publicos do repositorio do Regime Regular e empacota o JAR.
+# Clona a versao oficial, gera o banco SQLite a partir dos scripts Flyway publicos do
+# repositorio do Regime Regular e empacota o JAR.
 # Endpoint exposto: POST /api/calculadora/observabilidade/simples-nacional
 
 FROM eclipse-temurin:25-jdk AS build
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends git ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
+# O wrapper do repositorio oficial nao inclui o maven-wrapper.jar: instala o Maven.
+RUN curl -fsSL https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz -o /tmp/maven.tgz \
+    && tar -xzf /tmp/maven.tgz -C /opt \
+    && ln -s /opt/apache-maven-3.9.9/bin/mvn /usr/local/bin/mvn
 WORKDIR /app
 RUN git clone --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional.git .
-# A base de referencia (calculadora-pro.db) e gerada pelos scripts Flyway do
-# repositorio do Regime Regular (ADR009 do projeto oficial).
 RUN git clone --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git /tmp/regime
 RUN cp -r /tmp/regime/flyway ./flyway \
     && mkdir -p ./calculadora/db \
-    && ./mvnw flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf --batch-mode --errors \
-    && ./mvnw clean package -DskipTests --batch-mode
+    && mvn -B flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf --errors \
+    && mvn -B clean package -DskipTests
 
 FROM eclipse-temurin:25-jdk
 WORKDIR /app
