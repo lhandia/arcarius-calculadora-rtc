@@ -4,13 +4,13 @@
 
 FROM eclipse-temurin:25-jdk AS build
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends git ca-certificates maven \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN git clone --depth 1 https://github.com/ReceitaFederal/calculadora-rtc-regime-regular.git .
 RUN mkdir -p ./calculadora/db \
-    && ./mvnw flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf --batch-mode --errors \
-    && ./mvnw clean package -DskipTests --batch-mode
+    && mvn flyway:migrate -Dflyway.configFiles=./flyway/flyway-pro.conf --batch-mode --errors \
+    && mvn clean package -DskipTests --batch-mode
 
 FROM eclipse-temurin:25-jdk
 WORKDIR /app
